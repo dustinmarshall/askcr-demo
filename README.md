@@ -1,14 +1,6 @@
 # Simple AskCR Demo
 
-A minimal, clean ChatGPT-style chat application built with FastAPI and vanilla JavaScript. Features streaming responses, conversation history, and a modern dark theme interface.
-
-## ✨ Features
-
-- 🔄 **Streaming responses** - Real-time message streaming from OpenAI
-- 💬 **Conversation history** - Maintains context across messages
-- 🎨 **Modern dark UI** - Clean, responsive chat interface
-- ⚡ **Zero dependencies** - Pure JavaScript frontend, no build step required
-- 🚀 **Easy setup** - One command deployment with Make
+A minimal version of the AskCR app built with FastAPI and vanilla JavaScript. Features streaming responses, conversation history, and a minimal Web UI interface.
 
 ## 🛠️ Prerequisites
 
