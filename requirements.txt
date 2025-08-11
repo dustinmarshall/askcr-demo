@@ -1,0 +1,14 @@
+# Core web framework
+fastapi==0.111.1
+
+# ASGI server for FastAPI
+uvicorn==0.30.3
+
+# Data validation (comes with FastAPI but pinned for clarity)
+pydantic==2.8.2
+
+# OpenAI API client
+openai==1.99.6
+
+# Environment variable management
+python-dotenv==1.0.1

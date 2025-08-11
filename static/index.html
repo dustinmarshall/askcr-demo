@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Simple AskCR Demo</title>
+  <script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js"></script>
+  <style>
+    /* Base styles */
+    body {
+      margin: 0;
+      background: #f6f7dd;
+      color: #333;
+      font-family: "Averta W01 Regular", sans-serif;
+    }
+    
+    .font-bold {
+      font-family: "Averta W01 Bold", sans-serif !important;
+    }
+    
+    .font-black {
+      font-family: "Averta W01 Black", sans-serif !important;
+    }
+    
+    .container {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 16px;
+    }
+    
+    h1 {
+      font-size: 18px;
+      font-weight: 600;
+      margin: 12px 0 16px;
+    }
+    
+    /* Chat interface */
+    .list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-height: 60vh;
+    }
+    
+    .bubble {
+      padding: 12px;
+      border-radius: 12px;
+      max-width: 80%;
+      background: #fff;
+      color: #000;
+    }
+    
+    .user {
+      align-self: flex-end;
+    }
+    
+    .ai {
+      align-self: flex-start;
+    }
+    
+    /* Input controls */
+    .row {
+      display: flex;
+      gap: 8px;
+      margin-top: 16px;
+    }
+    
+    input[type="text"] {
+      flex: 1;
+      padding: 12px;
+      border-radius: 10px;
+      border: none;
+      outline: none;
+      background: #fff;
+      color: #333;
+    }
+    
+    button {
+      background: #05ae3c;
+      color: #fff;
+      border: none;
+      padding: 0 16px;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+    
+    button:disabled {
+      opacity: 0.6;
+      cursor: default;
+    }
+    
+    /* Markdown styles */
+    .bubble h1, .bubble h2, .bubble h3, .bubble h4, .bubble h5, .bubble h6 {
+      margin: 0.5em 0;
+      font-weight: bold;
+    }
+    
+    .bubble h1 { font-size: 1.2em; }
+    .bubble h2 { font-size: 1.1em; }
+    .bubble h3 { font-size: 1.05em; }
+    
+    .bubble p {
+      margin: 0.5em 0;
+      line-height: 1.4;
+    }
+    
+    .bubble code {
+      background: #f5f5f5;
+      padding: 2px 4px;
+      border-radius: 3px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.9em;
+    }
+    
+    .bubble pre {
+      background: #f5f5f5;
+      padding: 8px;
+      border-radius: 6px;
+      overflow-x: auto;
+      margin: 0.5em 0;
+    }
+    
+    .bubble pre code {
+      background: none;
+      padding: 0;
+    }
+    
+    .bubble ul, .bubble ol {
+      margin: 0.5em 0;
+      padding-left: 1.5em;
+    }
+    
+    .bubble li {
+      margin: 0.2em 0;
+    }
+    
+    .bubble blockquote {
+      border-left: 3px solid #ddd;
+      margin: 0.5em 0;
+      padding-left: 1em;
+      color: #666;
+    }
+    
+    .bubble strong {
+      font-weight: bold;
+    }
+    
+    .bubble em {
+      font-style: italic;
+    }
+    
+    .bubble a {
+      color: #05ae3c;
+      text-decoration: none;
+    }
+    
+    .bubble a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <img src="/static/askcr-logo.png" alt="AskCR" style="height: 60px; margin: 12px 0 16px;" />
+    <div id="list" class="list"></div>
+    <div class="row">
+      <input id="input" type="text" placeholder="Type a message" />
+      <button id="send">Send</button>
+    </div>
+  </div>
+
+  <script>
+    /**
+     * Simple AskCR Demo Chat Interface
+     * Handles message display and streaming responses from the API
+     */
+    
+    // DOM elements
+    const list = document.getElementById('list');
+    const input = document.getElementById('input');
+    const sendBtn = document.getElementById('send');
+    
+    // Chat state
+    let messageHistory = [];
+
+    /**
+     * Add a new message bubble to the chat
+     */
+    function addMessage(role, content) {
+      const div = document.createElement('div');
+      div.className = `bubble ${role === 'user' ? 'user' : 'ai'}`;
+      
+      if (role === 'user') {
+        // User messages stay as plain text to avoid XSS
+        div.textContent = content;
+      } else {
+        // AI messages get markdown compilation
+        div.innerHTML = content ? marked.parse(content) : '';
+      }
+      
+      list.appendChild(div);
+      scrollToBottom();
+      return div;
+    }
+
+    /**
+     * Update an existing message bubble with new content
+     */
+    function updateMessage(messageDiv, content) {
+      // Check if this is an AI message bubble (has 'ai' class)
+      if (messageDiv.classList.contains('ai')) {
+        messageDiv.innerHTML = content ? marked.parse(content) : '';
+      } else {
+        messageDiv.textContent = content;
+      }
+      scrollToBottom();
+    }
+
+    /**
+     * Scroll to bottom of chat
+     */
+    function scrollToBottom() {
+      window.scrollTo(0, document.body.scrollHeight);
+    }
+
+    /**
+     * Send a message and handle streaming response
+     */
+    async function send() {
+      const text = input.value.trim();
+      if (!text || sendBtn.disabled) return;
+      
+      // Add user message and reset input
+      addMessage('user', text);
+      input.value = '';
+      input.focus();
+      sendBtn.disabled = true;
+
+      // Create AI message bubble for streaming
+      const aiMessage = addMessage('assistant', '');
+      let fullResponse = '';
+
+      try {
+        const response = await fetch('/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            message: text,
+            messages: messageHistory
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        // Process streaming response
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || ''; // Keep incomplete line in buffer
+          
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const jsonStr = line.slice(6).trim();
+              if (!jsonStr) continue;
+              
+              try {
+                const data = JSON.parse(jsonStr);
+                
+                if (data.error) {
+                  updateMessage(aiMessage, `Error: ${data.error}`);
+                  return;
+                } else if (data.done) {
+                  // Add completed conversation to history
+                  messageHistory.push(
+                    { role: 'user', content: text },
+                    { role: 'assistant', content: fullResponse }
+                  );
+                  return;
+                } else if (data.content) {
+                  fullResponse += data.content;
+                  updateMessage(aiMessage, fullResponse);
+                }
+              } catch (e) {
+                console.warn('Failed to parse SSE data:', jsonStr, e);
+              }
+            }
+          }
+        }
+
+        // Fallback for empty response
+        if (!fullResponse) {
+          updateMessage(aiMessage, 'No response received');
+        }
+
+      } catch (error) {
+        updateMessage(aiMessage, `Error: ${error.message}`);
+        messageHistory.push({ role: 'user', content: text });
+      } finally {
+        sendBtn.disabled = false;
+      }
+    }
+
+    // Event listeners
+    sendBtn.addEventListener('click', send);
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') send();
+    });
+    
+    // Focus input on page load
+    input.focus();
+  </script>
+</body>
+</html>
